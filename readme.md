@@ -1,3 +1,3 @@
-# FPFF Decoder
+# py-fpff
 
-Decodes fpff files
+Reads, writes, and exports FPFF files

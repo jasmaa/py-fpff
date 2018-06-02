@@ -1,10 +1,12 @@
 import binascii
 from enum import Enum
-from PIL import Image
-import io
 import time
 import struct
+import os, shutil
 
+"""
+FPFF file type enum
+"""
 class FileType(Enum):
     ASCII = 1
     UTF8 = 2
@@ -17,6 +19,9 @@ class FileType(Enum):
     GIF87 = 9
     GIF89 = 10
 
+"""
+Contains FPFF functions
+"""
 class FPFF():
     @staticmethod
     def reverse_bytearray(s):
@@ -51,6 +56,9 @@ class FPFF():
         if file != None:
             self.read(file)
 
+    """
+    Read in FPFF
+    """
     def read(self, file):
         with open(file, "rb") as f:
             data = bytearray(f.read())
@@ -126,9 +134,10 @@ class FPFF():
             
             count += slen
             
-        print("done")
 
-    # assume data stored big endian
+    """
+    Write to FPFF file
+    """
     def write(self, file):
         # convert to bytes
         w_magic       = bytearray(b'\xDE\xDA\xFE\xBE')
@@ -189,11 +198,64 @@ class FPFF():
             f.write(bytes(out_data))
             f.close()
 
+    """
+    Export FPFF data to folder
+    """
+    def export(self, path):
+
+        # create path
+        dirpath = "/".join(path.split('/')[:-1])
+        dirname = path.split('/')[-1]
+
+        if dirpath != "":
+            dirpath += "/"
+
+        if os.path.exists(dirpath+dirname+"-data"):
+            shutil.rmtree(dirpath+dirname+"-data")  
+        os.makedirs(dirpath+dirname+"-data")
+
+        # export files
+        for i in range(self.sect_num):
+            out_name = dirpath+dirname+"-data/"+dirname+"-"+str(i+1)
+            w_svalue = None
+
+            if self.stypes[i] in [FileType.ASCII, FileType.UTF8, FileType.WORDS, FileType.DWORDS, FileType.DOUBLES, FileType.COORD, FileType.REF]:
+
+                if self.stypes[i] == FileType.ASCII:
+                    w_svalue = self.svalues[i]
+                elif self.stypes[i] == FileType.UTF8:
+                    w_svalue = self.svalues[i]
+                elif self.stypes[i] == FileType.WORDS:
+                    w_svalue = " ".join([ val.hex() for val in self.svalues[i]])
+                elif self.stypes[i] == FileType.DWORDS:
+                    w_svalue = " ".join([ val.hex() for val in self.svalues[i]])
+                elif self.stypes[i] == FileType.DOUBLES:
+                    w_svalue = " ".join([ str(val) for val in self.svalues[i]])
+                elif self.stypes[i] == FileType.COORD:
+                    w_svalue = "LAT: " + str(self.svalues[i][0]) + "\nLON: " + str(self.svalues[i][1])
+                elif self.stypes[i] == FileType.REF:
+                    w_svalue = "REF: " + str(self.svalues[i])
+                
+                with open(out_name+".txt", 'w') as f:
+                    f.write(w_svalue)
+                    f.close()
+            else:
+                if self.stypes[i] == FileType.PNG:
+                    with open(out_name+".png", 'wb') as f:
+                        f.write(self.svalues[i])
+                        f.close()
+                elif self.stypes[i] == FileType.GIF87:
+                    with open(out_name+".gif", 'wb') as f:
+                        f.write(self.svalues[i])
+                        f.close()
+                elif self.stypes[i] == FileType.GIF89:
+                    with open(out_name+".gif", 'wb') as f:
+                        f.write(self.svalues[i])
+                        f.close()
+        
+
     def __repr__(self):
         return str(self.stypes)
 
-s = FPFF("hi")
-#s.write('hi')
-"""
-out_name = file.split(".")[0]+"-"+str(i+1)
-"""
+s = FPFF("testing/test.fpff")
+s.export('testing/lol')
