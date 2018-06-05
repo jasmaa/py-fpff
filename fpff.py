@@ -322,6 +322,3 @@ class FPFF():
 
     def __repr__(self):
         return str(self.stypes)
-
-s = FPFF("testing/test.fpff")
-s.export('testing/lol')
