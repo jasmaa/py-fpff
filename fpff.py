@@ -39,7 +39,7 @@ class FPFF():
     def add_padding(data, l):
 
         if len(data) > l:
-            raise ValueError("Data too large to be padded!")
+            raise OverflowError("Data too large to be padded!")
         
         while len(data) < l:
             data.insert(0, 0)
@@ -49,7 +49,7 @@ class FPFF():
         self.version = 1
         self.timestamp = None
         self.author = None
-        self.sections = 0
+        self.sect_num = 0
         self.stypes = list()
         self.svalues = list()
 
@@ -71,11 +71,11 @@ class FPFF():
 
         # checks
         if magic != b'\xbe\xfe\xda\xde':
-            print("Wrong header")
-            return
+            raise ValueError("Not a valid FPFF stream.")
         if self.version != 1:
-            print("Not version 1")
-            return
+            raise ValueError("Unsupported version. Only version 1 is supported.")
+        if self.sect_num <= 0:
+            raise ValueError("Section length must be greater than 0.")
 
         # read sections
         count = 24
@@ -131,9 +131,33 @@ class FPFF():
                 sig = b'\x47\x49\x46\x38\x39\x61'
                 out = sig + svalue[0:slen]
                 self.svalues.append(out)
+
+            else:
+                raise ValueError("Stream contained an unsupported type.")
             
             count += slen
-            
+
+        # validate
+        self.validate_fpff()
+
+    """
+    Checks if imported FPFF is valid
+    """
+    def validate_fpff(self):
+        for i in range(self.sect_num):
+            if self.stypes[i] == FileType.WORDS:
+                for w in self.svalues[i]:
+                    if len(w) != 4:
+                        raise ValueError("FPFF is not valid. Improper word length.")
+            elif self.stypes[i] == FileType.DWORDS:
+                for w in self.svalues[i]:
+                    if len(w) != 8:
+                        raise ValueError("FPFF is not valid. Improper dword length.")
+            elif self.stypes[i] == FileType.REF:
+                if self.svalues[i] > self.sect_num:
+                    raise ValueError("FPFF is not valid. Reference out of bounds.")
+                
+        
 
     """
     Write to FPFF file
@@ -252,7 +276,49 @@ class FPFF():
                     with open(out_name+".gif", 'wb') as f:
                         f.write(self.svalues[i])
                         f.close()
+
+    """
+    Add data
+    """
+    def add(self, obj_data, obj_type, i=0):
+        # rudimentry type check
+        if obj_type == FileType.ASCII and type(obj_data) == str:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.UTF8 and type(obj_data) == str:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.WORDS and type(obj_data) == list:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.DWORDS and type(obj_data) == list:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.DOUBLES and type(obj_data) == list:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.COORD and type(obj_data) == tuple:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.REF and type(obj_data) == int:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.PNG and type(obj_data) == bytearray:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.GIF87 and type(obj_data) == bytearray:
+            self.svalues.insert(i, obj_data)
+        elif obj_type == FileType.GIF89 and type(obj_data) == bytearray:
+            self.svalues.insert(i, obj_data)
+            
+        else:
+            raise TypeError("Object data not valid for object type.")
+
+        self.stypes.insert(i, obj_type)
+        self.sect_num += 1
+            
         
+
+    """
+    Remove data
+    """
+    def remove(self, i):
+        del self.svalues[i]
+        del self.stypes[i]
+        self.sect_num -= 1
+    
 
     def __repr__(self):
         return str(self.stypes)
