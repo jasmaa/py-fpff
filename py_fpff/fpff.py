@@ -68,6 +68,8 @@ class FPFF():
         self.timestamp   = int.from_bytes(data[8:12], "little")
         self.author      = FPFF.remove_padding(FPFF.reverse_bytearray(data[12:20])).decode('ascii')
         self.sect_num    = int.from_bytes(data[20:24], "little")
+        self.stypes = list()
+        self.svalues = list()
 
         # checks
         if magic != b'\xbe\xfe\xda\xde':
