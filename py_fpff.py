@@ -1,7 +1,9 @@
-from enum import IntEnum
 import os
 import shutil
-from typing import Any
+import time
+import struct
+from typing import Any, BinaryIO
+from enum import IntEnum
 
 
 class FileType(IntEnum):
@@ -19,32 +21,31 @@ class FileType(IntEnum):
     GIF89 = 10
 
 
-class FPFF():
+class FPFF:
     """Handles read, write, and export for FPFF.
     """
 
-    def __init__(self, file_path: str = None, author: str = None):
+    def __init__(self, file: BinaryIO = None, author: str = ''):
         self.version = 1
-        self.timestamp = None
-        self.author = None
+        self.timestamp = int(time.time())
+        self.author = author
         self.nsects = 0
         self.stypes = list()
         self.svalues = list()
 
         # Read FPFF file if supplied
-        if file_path != None:
-            self.read(file_path)
+        if file != None:
+            self.read(file)
 
-    def read(self, file_path: str):
+    def read(self, file: BinaryIO):
         """Reads in FPFF.
         """
-        self.__file = open(file_path, 'rb')
-        data = self.__file.read(24)
+        data = file.read(24)
 
         magic = data[0:4][::-1]
         self.version = int.from_bytes(data[4:8], 'little')
         self.timestamp = int.from_bytes(data[8:12], 'little')
-        self.author = data[12:20][::-1].decode('ascii')
+        self.author = data[12:20][::-1].decode('ascii').strip('\0')
         self.nsects = int.from_bytes(data[20:24], 'little')
         self.stypes = []
         self.svalues = []
@@ -56,16 +57,18 @@ class FPFF():
             raise ValueError(
                 "Unsupported version. Only version 1 is supported."
             )
-        if self.nsects <= 0:
-            raise ValueError("Section length must be greater than 0.")
 
         # Read each section
         for _ in range(self.nsects):
             # Read section header and data
-            data = self.__file.read(8)
+            data = file.read(8)
             stype = int.from_bytes(data[0:4], 'little')
             slen = int.from_bytes(data[4:8], 'little')
-            svalue = self.__file.read(slen)
+
+            if slen <= 0:
+                raise ValueError("Section length must be greater than 0.")
+
+            svalue = file.read(slen)
 
             # Decode section data
             if stype == 0x1:
@@ -80,21 +83,17 @@ class FPFF():
                 # Words
                 if slen % 4 != 0:
                     raise ValueError("Improper section length.")
-                self.stypes.append(FileType.DOUBLES)
                 self.stypes.append(FileType.WORDS)
                 self.svalues.append(
-                    [bytes(svalue[j:j+4])
-                     for j in range(0, slen, 4)]
+                    [svalue[j:j+4] for j in range(0, slen, 4)]
                 )
             elif stype == 0x4:
                 # DWords
                 if slen % 8 != 0:
                     raise ValueError("Improper section length.")
-                self.stypes.append(FileType.DOUBLES)
                 self.stypes.append(FileType.DWORDS)
                 self.svalues.append(
-                    [bytes(svalue[j:j+8])
-                     for j in range(0, slen, 8)]
+                    [svalue[j:j+8] for j in range(0, slen, 8)]
                 )
             elif stype == 0x5:
                 # Doubles
@@ -102,7 +101,7 @@ class FPFF():
                     raise ValueError("Improper section length.")
                 self.stypes.append(FileType.DOUBLES)
                 self.svalues.append(
-                    [float.from_bytes(svalue[j:j+8], 'big')
+                    [struct.unpack("<d", svalue[j:j+8])[0]
                      for j in range(0, slen, 8)]
                 )
             elif stype == 0x6:
@@ -110,15 +109,15 @@ class FPFF():
                 if slen != 16:
                     raise ValueError("Improper section length.")
                 self.stypes.append(FileType.COORD)
-                lat = float.from_bytes(svalue[0:8], 'big')
-                lng = float.from_bytes(svalue[8:16], 'big')
+                lat = struct.unpack("<d", svalue[0:8])[0]
+                lng = struct.unpack("<d", svalue[8:16])[0]
                 # TODO: validate lat and lng
                 self.svalues.append((lat, lng))
             elif stype == 0x7:
                 # Reference
                 if slen != 4:
                     raise ValueError("Improper section length.")
-                ref = int.from_bytes(svalue[0:4], 'big')
+                ref = int.from_bytes(svalue[0:4], 'little')
                 if ref < 0 or ref >= self.nsects:
                     raise ValueError("Reference value is out of bounds.")
                 self.stypes.append(FileType.REF)
@@ -144,19 +143,17 @@ class FPFF():
             else:
                 raise ValueError("File contained an unsupported type.")
 
-    def write(self, file_path: str):
+    def write(self, file: BinaryIO):
         """Write to FPFF file.
         """
-        self.__file = open(file_path, 'wb')
-
         # Write FPFF header
-        self.__file.write(b'\xDE\xDA\xFE\xBE')
-        self.__file.write(self.version.to_bytes(4, 'little'))
-        self.__file.write(self.timestamp.to_bytes(4, 'little'))
+        file.write(b'\xDE\xDA\xFE\xBE')
+        file.write(self.version.to_bytes(4, 'little'))
+        file.write(self.timestamp.to_bytes(4, 'little'))
         author_bytes = self.author.encode('ascii')[::-1]
-        self.__file.write(author_bytes)
-        self.__file.write(b'\x00'*(8-len(author_bytes)))
-        self.__file.write(self.nsects.to_bytes(4, 'little'))
+        file.write(author_bytes)
+        file.write(b'\x00'*(8-len(author_bytes)))
+        file.write(self.nsects.to_bytes(4, 'little'))
 
         # Write each section
         for i in range(self.nsects):
@@ -170,23 +167,25 @@ class FPFF():
                 section_bytes = self.svalues[i].encode('utf8')
             elif self.stypes[i] == FileType.WORDS:
                 # Words
-                section_bytes = b''.join(
-                    [w.to_bytes(4, 'little') for w in self.svalues[i]]
-                )
+                for w in self.svalues[i]:
+                    if len(w) != 4:
+                        raise ValueError("Word needs to be 4 bytes.")
+                    section_bytes += w
             elif self.stypes[i] == FileType.DWORDS:
                 # DWords
-                section_bytes = b''.join(
-                    [w.to_bytes(8, 'little') for w in self.svalues[i]]
-                )
+                for w in self.svalues[i]:
+                    if len(w) != 8:
+                        raise ValueError("DWord needs to be 8 bytes.")
+                    section_bytes += w
             elif self.stypes[i] == FileType.DOUBLES:
                 # Doubles
                 section_bytes = b''.join(
-                    [w.to_bytes(8, 'little') for w in self.svalues[i]]
+                    [struct.pack("<d", w) for w in self.svalues[i]]
                 )
             elif self.stypes[i] == FileType.COORD:
                 # Coords
-                section_bytes = self.svalues[i][0].to_bytes(8, 'little')
-                section_bytes += self.svalues[i][1].to_bytes(8, 'little')
+                section_bytes = struct.pack("<d", self.svalues[i][0])
+                section_bytes += struct.pack("<d", self.svalues[i][1])
             elif self.stypes[i] == FileType.REF:
                 # Reference
                 section_bytes = self.svalues[i].to_bytes(4, 'little')
@@ -201,9 +200,9 @@ class FPFF():
                 section_bytes = self.svalues[i][6:]
 
             # Write to file
-            self.__file.write(self.stypes[i].to_bytes(4, 'little'))
-            self.__file.write(len(section_bytes).to_bytes(4, 'little'))
-            self.__file.write(section_bytes)
+            file.write(self.stypes[i].to_bytes(4, 'little'))
+            file.write(len(section_bytes).to_bytes(4, 'little'))
+            file.write(section_bytes)
 
     def export(self, output_path: str):
         """Export FPFF to folder.
@@ -259,37 +258,42 @@ class FPFF():
                     with open(file_name, 'wb') as f:
                         f.write(self.svalues[i])
 
-    def insert(self, i: int, obj_type: FileType, obj_data: Any):
-        """Insert data.
+    def insert(self, section_idx: int, obj_type: FileType, obj_data: Any):
+        """Insert section.
         """
         if obj_type == FileType.ASCII and type(obj_data) == str:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.UTF8 and type(obj_data) == str:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.WORDS and type(obj_data) == list:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.DWORDS and type(obj_data) == list:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.DOUBLES and type(obj_data) == list:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.COORD and type(obj_data) == tuple:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.REF and type(obj_data) == int:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.PNG and type(obj_data) == bytearray:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.GIF87 and type(obj_data) == bytearray:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         elif obj_type == FileType.GIF89 and type(obj_data) == bytearray:
-            self.svalues.insert(i, obj_data)
+            self.svalues.insert(section_idx, obj_data)
         else:
             raise TypeError("Object data not valid for object type.")
 
-        self.stypes.insert(i, obj_type)
+        self.stypes.insert(section_idx, obj_type)
         self.nsects += 1
 
+    def append(self, obj_type: FileType, obj_data: Any):
+        """Append section.
+        """
+        self.insert(self.nsects, obj_type, obj_data)
+
     def remove(self, i: int):
-        """Remove data.
+        """Remove section.
         """
         del self.svalues[i]
         del self.stypes[i]

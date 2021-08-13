@@ -8,6 +8,7 @@ Reads, writes, and exports FPFF files
 ```
 pip install py-fpff
 ```
+
 ### Sample code
 ```
 from py_fpff import fpff
@@ -24,4 +25,10 @@ s.read("hello_world_2.fpff")
 
 # export
 s.export("export-hello-world-2")
+```
+
+## Test
+
+```
+python -m unittest
 ```
