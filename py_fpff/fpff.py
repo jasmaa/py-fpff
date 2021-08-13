@@ -1,12 +1,11 @@
 from enum import IntEnum
-import time
-import struct
 import os
 import shutil
+from typing import Any
 
 
 class FileType(IntEnum):
-    """FPFF file types
+    """FPFF file types.
     """
     ASCII = 1
     UTF8 = 2
@@ -23,28 +22,6 @@ class FileType(IntEnum):
 class FPFF():
     """Handles read, write, and export for FPFF.
     """
-
-    @staticmethod
-    def reverse_bytearray(s):
-        rev = bytearray()
-        for i in range(len(s)-1, -1, -1):
-            rev.append(s[i])
-        return rev
-
-    @staticmethod
-    def remove_padding(data):
-        while data[0] == 0:
-            data.pop(0)
-        return data
-
-    @staticmethod
-    def add_padding(data, l):
-        if len(data) > l:
-            raise OverflowError("Data too large to be padded!")
-
-        while len(data) < l:
-            data.insert(0, 0)
-        return data
 
     def __init__(self, file_path: str = None, author: str = None):
         self.version = 1
@@ -72,7 +49,7 @@ class FPFF():
         self.stypes = []
         self.svalues = []
 
-        # Read checks
+        # Metadata checks
         if magic != b'\xBE\xFE\xDA\xDE':
             raise ValueError("Magic did not match FPFF magic.")
         if self.version != 1:
@@ -228,69 +205,63 @@ class FPFF():
             self.__file.write(len(section_bytes).to_bytes(4, 'little'))
             self.__file.write(section_bytes)
 
-    def export(self, path):
-        """Export FPFF data to folder.
+    def export(self, output_path: str):
+        """Export FPFF to folder.
         """
 
-        # create path
-        dirpath = "/".join(path.split('/')[:-1])
-        dirname = path.split('/')[-1]
+        # Ensure output path exists
+        if os.path.exists(output_path):
+            shutil.rmtree(output_path)
+        os.mkdir(output_path)
 
-        if dirpath != "":
-            dirpath += "/"
-
-        if os.path.exists(dirpath+dirname+"-data"):
-            shutil.rmtree(dirpath+dirname+"-data")
-        os.makedirs(dirpath+dirname+"-data")
-
-        # export files
+        # Export files
         for i in range(self.nsects):
-            out_name = dirpath+dirname+"-data/"+dirname+"-"+str(i+1)
-            w_svalue = None
-
-            if self.stypes[i] in [FileType.ASCII, FileType.UTF8, FileType.WORDS, FileType.DWORDS, FileType.DOUBLES, FileType.COORD, FileType.REF]:
-
+            if self.stypes[i] not in [FileType.PNG, FileType.GIF87, FileType.GIF89]:
+                # Non-media section
+                file_name = f'section-{i}.txt'
+                output = ''
                 if self.stypes[i] == FileType.ASCII:
-                    w_svalue = self.svalues[i]
+                    output = self.svalues[i]
                 elif self.stypes[i] == FileType.UTF8:
-                    w_svalue = self.svalues[i]
+                    output = self.svalues[i]
                 elif self.stypes[i] == FileType.WORDS:
-                    w_svalue = " ".join([val.hex()
-                                        for val in self.svalues[i]])
+                    output = ', '.join(
+                        [val.hex() for val in self.svalues[i]]
+                    )
                 elif self.stypes[i] == FileType.DWORDS:
-                    w_svalue = " ".join([val.hex()
-                                        for val in self.svalues[i]])
+                    output = ', '.join(
+                        [val.hex() for val in self.svalues[i]]
+                    )
                 elif self.stypes[i] == FileType.DOUBLES:
-                    w_svalue = " ".join([str(val)
-                                        for val in self.svalues[i]])
+                    output = ', '.join(
+                        [str(val) for val in self.svalues[i]]
+                    )
                 elif self.stypes[i] == FileType.COORD:
-                    w_svalue = "LAT: " + \
-                        str(self.svalues[i][0]) + \
-                        "\nLON: " + str(self.svalues[i][1])
+                    output = f'LAT: {str(self.svalues[i][0])}\nLNG: {str(self.svalues[i][1])}'
                 elif self.stypes[i] == FileType.REF:
-                    w_svalue = "REF: " + str(self.svalues[i])
+                    output = f'REF: {str(self.svalues[i])}'
 
-                with open(out_name+".txt", 'w') as f:
-                    f.write(w_svalue)
-                    f.close()
+                with open(os.path.join(output_path, file_name), 'w') as f:
+                    f.write(output)
+
             else:
+                # Media section
                 if self.stypes[i] == FileType.PNG:
-                    with open(out_name+".png", 'wb') as f:
+                    file_name = f'section-{i}.png'
+                    with open(file_name, 'wb') as f:
                         f.write(self.svalues[i])
-                        f.close()
                 elif self.stypes[i] == FileType.GIF87:
-                    with open(out_name+".gif", 'wb') as f:
+                    file_name = f'section-{i}.gif'
+                    with open(file_name, 'wb') as f:
                         f.write(self.svalues[i])
-                        f.close()
                 elif self.stypes[i] == FileType.GIF89:
-                    with open(out_name+".gif", 'wb') as f:
+                    file_name = f'section-{i}.gif'
+                    with open(file_name, 'wb') as f:
                         f.write(self.svalues[i])
-                        f.close()
 
-    def add(self, obj_data, obj_type, i=0):
-        """Add data.
+    def insert(self, i: int, obj_type: FileType, obj_data: Any):
+        """Insert data.
         """
-        # rudimentry type check
         if obj_type == FileType.ASCII and type(obj_data) == str:
             self.svalues.insert(i, obj_data)
         elif obj_type == FileType.UTF8 and type(obj_data) == str:
@@ -311,14 +282,13 @@ class FPFF():
             self.svalues.insert(i, obj_data)
         elif obj_type == FileType.GIF89 and type(obj_data) == bytearray:
             self.svalues.insert(i, obj_data)
-
         else:
             raise TypeError("Object data not valid for object type.")
 
         self.stypes.insert(i, obj_type)
         self.nsects += 1
 
-    def remove(self, i):
+    def remove(self, i: int):
         """Remove data.
         """
         del self.svalues[i]
