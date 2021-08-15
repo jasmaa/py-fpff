@@ -240,7 +240,7 @@ class FPFF:
                 elif self.stypes[i] == FileType.REF:
                     output = f'REF: {str(self.svalues[i])}'
 
-                with open(os.path.join(output_path, file_name), 'w') as f:
+                with open(os.path.join(output_path, file_name), 'w', encoding='utf8') as f:
                     f.write(output)
 
             else:
