@@ -2,7 +2,7 @@ import unittest
 import os
 import tempfile
 import shutil
-from py_fpff import FPFF, FileType
+from py_fpff import FPFF, SectionType
 
 
 class FPFFTest(unittest.TestCase):
@@ -46,15 +46,15 @@ class FPFFTest(unittest.TestCase):
 
         fpff_1 = FPFF(author='jasmaa')
         data = [
-            (FileType.ASCII, 'Hello, world!'),
-            (FileType.UTF8, 'おはよう世界'),
-            (FileType.WORDS, [b'\x00\x00\x00\x00', b'\xFF\xFF\xFF\xFF']),
-            (FileType.DWORDS, [
+            (SectionType.ASCII, 'Hello, world!'),
+            (SectionType.UTF8, 'おはよう世界'),
+            (SectionType.WORDS, [b'\x00\x00\x00\x00', b'\xFF\xFF\xFF\xFF']),
+            (SectionType.DWORDS, [
              b'\xFF\xFF\xFF\xFF\xFF\x9A\x00\xFF', b'\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF'
              ]),
-            (FileType.REF, 1),
-            (FileType.DOUBLES, [-1, 0, 0.3, -0.53]),
-            (FileType.COORD, (90.23, -200.34)),
+            (SectionType.REF, 1),
+            (SectionType.DOUBLES, [-1, 0, 0.3, -0.53]),
+            (SectionType.COORD, (90.23, -200.34)),
         ]
         with open(file_path, 'wb') as f:
             for t, v in data:
