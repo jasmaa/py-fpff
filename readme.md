@@ -1,12 +1,22 @@
 # py-fpff
 
-Reads, writes, and exports FPFF files
+Library for working with FPFF.
 
-## Installation and Usage
+## Getting Started
 
 ### Install
 ```
 pip install py-fpff
+```
+
+### Sample Code
+```
+from py_fpff import FPFF, SectionType
+
+with open('./input.fpff') as f:
+    fpff = FPFF(f)
+    fpff.append(SectionType.ASCII, 'Hello, world!')
+    fpff.export('./exported')
 ```
 
 ## Testing
