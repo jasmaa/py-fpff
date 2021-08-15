@@ -77,6 +77,55 @@ class FPFFTest(unittest.TestCase):
                 for n1, n2 in zip(v1, v2):
                     assert abs(n1 - n2) < 0.001
 
+    def test_media(self):
+        file_path = os.path.join(self.test_dir, 'out.fpff')
+
+        with open(file_path, 'wb') as out_f:
+            fpff_1 = FPFF(author='jasmaa')
+            with open('./tests/test_png.png', 'rb') as in_f:
+                data = in_f.read()
+                fpff_1.append(SectionType.PNG, data)
+            with open('./tests/test_gif87.gif', 'rb') as in_f:
+                data = in_f.read()
+                fpff_1.append(SectionType.GIF87, data)
+            with open('./tests/test_gif89.gif', 'rb') as in_f:
+                data = in_f.read()
+                fpff_1.append(SectionType.GIF89, data)
+            fpff_1.write(out_f)
+
+        with open(file_path, 'rb') as f:
+            fpff_2 = FPFF(f)
+            assert fpff_2.version == 1
+            assert fpff_2.author == 'jasmaa'
+            assert fpff_2.nsects == 3
+
+            with open('./tests/test_png.png', 'rb') as in_f:
+                data = in_f.read()
+                assert SectionType.PNG == fpff_2.stypes[0]
+                assert data == fpff_2.svalues[0]
+            with open('./tests/test_gif87.gif', 'rb') as in_f:
+                data = in_f.read()
+                assert SectionType.GIF87 == fpff_2.stypes[1]
+                assert data == fpff_2.svalues[1]
+            with open('./tests/test_gif89.gif', 'rb') as in_f:
+                data = in_f.read()
+                assert SectionType.GIF89 == fpff_2.stypes[2]
+                assert data == fpff_2.svalues[2]
+
+    def test_append_remove(self):
+        fpff = FPFF(author='jasmaa')
+        fpff.append(SectionType.ASCII, 'a')
+        fpff.append(SectionType.ASCII, 'c')
+        fpff.append(SectionType.ASCII, 'd')
+        fpff.insert(1, SectionType.ASCII, 'b')
+        fpff.remove(3)
+
+        assert fpff.nsects == 3
+
+        vals = ['a', 'b', 'c']
+        for v1, v2 in zip(vals, fpff.svalues):
+            assert v1 == v2
+
 
 if __name__ == '__main__':
     unittest.main()

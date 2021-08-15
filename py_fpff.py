@@ -46,7 +46,7 @@ class FPFF:
         Args:
             file (BinaryIO): Optional FPFF input byte stream. Provided if reading FPFF.
             author (str): Author name. Defaults to ''.
-        
+
         Example:
             >>> with open('./input.fpff', 'rb') as f:
             >>>     fpff = FPFF(f)
@@ -195,7 +195,7 @@ class FPFF:
         Raises:
             ValueError: Word needs to be 4 bytes.
             ValueError: DWord needs to be 8 bytes.
-        
+
         Example:
             >>> with open('./output.fpff', 'wb') as out_f:
             >>>     fpff = FPFF()
@@ -266,7 +266,7 @@ class FPFF:
 
         Args:
             output_path (str): Path to export directory.
-        
+
         Example:
             >>> with open('./input.fpff') as f:
             >>>     fpff = FPFF(f)
@@ -312,15 +312,15 @@ class FPFF:
                 # Media section
                 if self.stypes[i] == SectionType.PNG:
                     file_name = f'section-{i}.png'
-                    with open(file_name, 'wb') as f:
+                    with open(os.path.join(output_path, file_name), 'wb') as f:
                         f.write(self.svalues[i])
                 elif self.stypes[i] == SectionType.GIF87:
                     file_name = f'section-{i}.gif'
-                    with open(file_name, 'wb') as f:
+                    with open(os.path.join(output_path, file_name), 'wb') as f:
                         f.write(self.svalues[i])
                 elif self.stypes[i] == SectionType.GIF89:
                     file_name = f'section-{i}.gif'
-                    with open(file_name, 'wb') as f:
+                    with open(os.path.join(output_path, file_name), 'wb') as f:
                         f.write(self.svalues[i])
 
     def insert(self, section_idx: int, obj_type: SectionType, obj_data: Any):
@@ -333,7 +333,7 @@ class FPFF:
 
         Raises:
             TypeError: Object data not valid for object type.
-        
+
         Example:
             >>> fpff.insert(0, SectionType.ASCII, 'Hello, world!')
         """
@@ -352,11 +352,11 @@ class FPFF:
             self.svalues.insert(section_idx, obj_data)
         elif obj_type == SectionType.REF and type(obj_data) == int:
             self.svalues.insert(section_idx, obj_data)
-        elif obj_type == SectionType.PNG and type(obj_data) == bytearray:
+        elif obj_type == SectionType.PNG and type(obj_data) in [bytes, bytearray]:
             self.svalues.insert(section_idx, obj_data)
-        elif obj_type == SectionType.GIF87 and type(obj_data) == bytearray:
+        elif obj_type == SectionType.GIF87 and type(obj_data) in [bytes, bytearray]:
             self.svalues.insert(section_idx, obj_data)
-        elif obj_type == SectionType.GIF89 and type(obj_data) == bytearray:
+        elif obj_type == SectionType.GIF89 and type(obj_data) in [bytes, bytearray]:
             self.svalues.insert(section_idx, obj_data)
         else:
             raise TypeError("Object data not valid for object type.")
@@ -370,7 +370,7 @@ class FPFF:
         Args:
             obj_type (int): Section type of new section.
             obj_data (Any): Section value of new section.
-        
+
         Example:
             >>> fpff.append(SectionType.ASCII, 'Hello, world!')
         """
@@ -382,10 +382,11 @@ class FPFF:
 
         Args:
             section_idx (int): Index of section to remove.
-        
+
         Example:
             >>> fpff.remove(0)
         """
+
         del self.svalues[section_idx]
         del self.stypes[section_idx]
         self.nsects -= 1
@@ -396,4 +397,5 @@ class FPFF:
         Returns:
             string: String representation of FPFF.
         """
+
         return str(self.stypes)
