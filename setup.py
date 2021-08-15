@@ -5,7 +5,7 @@ with open("readme.md", "r") as f:
 
 setuptools.setup(
     name="py-fpff",
-    version="0.0.1",
+    version="1.0.0",
     author="Jason Maa",
     description="Reads, writes, and exports FPFF files",
     long_description=long_description,
