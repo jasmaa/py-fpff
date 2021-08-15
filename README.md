@@ -1,6 +1,7 @@
 # py-fpff
 
 [![PyPi version](https://img.shields.io/pypi/v/py-fpff)](https://pypi.org/project/py-fpff/)
+[![RTD build](https://img.shields.io/readthedocs/py-fpff)](https://py-fpff.readthedocs.io/en/latest/)
 
 Library for working with FPFF.
 
