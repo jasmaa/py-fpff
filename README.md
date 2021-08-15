@@ -1,5 +1,7 @@
 # py-fpff
 
+[![PyPi version](https://img.shields.io/pypi/v/py-fpff)](https://pypi.org/project/py-fpff/)
+
 Library for working with FPFF.
 
 ## Getting Started
